@@ -163,5 +163,5 @@ cython_debug/
 
 #file di python da non considerare
 api.py
-
+api_testnet.py
 #altri file da ignorare 
