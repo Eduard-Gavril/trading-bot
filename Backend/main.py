@@ -31,8 +31,9 @@ def get_tickers():
     resp = session.get_tickers (category="linear")['result']['list']
     symbols = []
     for elem in resp:
-        if 'USDT' in elem['symbol'] and not 'USDC' in elem['symbol']:
+        if 'USDT' in elem['symbol'] and not 'USDC' in elem['symbol'] and not "1" in elem['symbol'] :
             symbols.append(elem['symbol'])
+
     return symbols
 
 
@@ -47,6 +48,10 @@ def klines (symbol):
         limit=500 #last 500 candles
         )['result']['list']
     resp = pd.DataFrame(resp)
+    df = pd.DataFrame(resp)
+    if df.empty:  # check if the dataframe is empty 
+        print(f"No data available for {symbol}")
+        return pd.DataFrame()  # if so u get a void db 
     resp.columns = ['Time', 'Open', 'High', 'Low', 'Close', 'Volume', 'Turnover']
     resp = resp.set_index('Time')
     resp = resp.astype(float)
@@ -73,15 +78,18 @@ def get_positions():
 #set different parameter for each coin u trade ( cos for one coin can be goot and bad for another one)
 
 def set_mode(symbol):
+    try:
+        resp = session.switch_margin_mode(
+            category='linear',
+            symbol=symbol,
+            tradeMode=1,
+            buyLeverage=25,
+            sellLeverage=25
+        )
+        print("mode set ... OK")
+    except Exception as err:
+        print(f"mode set ... NOK")
 
-    resp = session.switch_margin_mode(
-        category = "linear",
-        symbol = symbol,
-        tradeMode = 1, # 0 for CROSS 1 for ISOLATED
-        buyLeverage = 25, # % of leverage
-        sellLeverage = 25
-    )
-    print(resp)
 
 # now we need a funtion to get the decimal number based of the value of the symbol we are trading 
 # so we can validate the position we are opening 
@@ -108,9 +116,6 @@ def get_precision(symbol):
     return price, qty
 
 
-#print(get_precision("ETHUSDT")) # we should get 2,2
-
-
 #now we need a funtion to place orders 
 
 def place_order_market(symbol, side):
@@ -122,41 +127,56 @@ def place_order_market(symbol, side):
         symbol = symbol
     )["result"]["list"][0]["markPrice"]
     mark_price = float(mark_price)
-    print(f"Placing {side} order for {symbol}. Mark price: {mark_price}")
+    print(f"Trying placing {side} order for {symbol}")
 
     order_qty = round(100/mark_price, qty_precision)  #chenge the value of 100 sice they rapresent the USDT used for operation
     sleep(2)
 
+    #definition of  entry price point
+    entry_price = mark_price  
+    print(f"Entry price for {symbol}: {entry_price}")
+
+    #define resp before existing 
+    resp = {"error": True, "message": "Order not placed"}
+
     if side == "Buy":
         tp_price = round(mark_price + mark_price * 0.02, price_precision) # decimal means 2%
         sl_price = round(mark_price - mark_price * 0.01, price_precision) # decimal means 1%
-        resp = session.place_order(
-            category = "linear",
-            symbol = symbol,
-            side = "Buy",
-            order_type = "Limit",
-            qty = order_qty,
-            takeProfit = tp_price,
-            stopLoss = sl_price,
-            tpTriggerBy='Market',
-            slTriggerBy='Market'
-        )
-    if side == "sell":
-            tp_price = round(mark_price - mark_price * 0.02, price_precision) # decimal means 2%
-            sl_price = round(mark_price + mark_price * 0.01, price_precision) # decimal means 1%
+        try:
             resp = session.place_order(
                 category = "linear",
                 symbol = symbol,
-                side = "Sell",
+                side = "Buy",
                 order_type = "Limit",
                 qty = order_qty,
+                price=str(entry_price),  # entry price point
                 takeProfit = tp_price,
                 stopLoss = sl_price,
-                tpTriggerBy='Market',
-                slTriggerBy='Market'
+                tpTriggerBy=None, #removed or set for market operations 
+                slTriggerBy=None  #removed or set for market operations 
             )
-
+        except Exception as e:
+            print(f"Error creating order, NOK")
+    if side == "sell":
+            tp_price = round(mark_price - mark_price * 0.02, price_precision) # decimal means 2%
+            sl_price = round(mark_price + mark_price * 0.01, price_precision) # decimal means 1%
+            try:
+                resp = session.place_order(
+                    category = "linear",
+                    symbol = symbol,
+                    side = "Sell",
+                    order_type = "Limit",
+                    qty = order_qty,
+                    price=str(entry_price),  # entry price point
+                    takeProfit = tp_price,
+                    stopLoss = sl_price,
+                    tpTriggerBy=None, #removed or set for market operations 
+                    slTriggerBy=None  #removed or set for market operations 
+                )
+            except Exception as e:
+                        print(f"Error creating order, NOK")
     print(resp)
+    return resp
 
 
 #now we have to define our strategy 
@@ -172,7 +192,7 @@ def rsi_signal(symbol):
         return "none", round(rsi.iloc[-1], 2)
     
 
-max_pos = 50
+max_pos = 10
 symbols = get_tickers()
 
 while True:
@@ -190,10 +210,14 @@ while True:
                 if len(pos) > max_pos:
                     break
                 signal = rsi_signal(elem)
-                print(f"the actual signal trand is: {signal}")
-                if signal[0] == "none":
-                    print("wait for 30sec")
-                    sleep(30)
+
+
+                #print(f"the actual signal trand is: {signal}")
+                #if signal[0] == "none":
+                #    print("wait for 30sec")
+                #    sleep(30)
+
+
                 if signal[0] == 'up' and not elem in pos:
                     print (f'Found BUY signal for {elem}')
                     set_mode(elem)
