@@ -23,7 +23,6 @@ def BalanceAccount():
     resp = float(resp)
     return resp
 
-
 #function to get all the coins tradable 
 
 def get_tickers():
@@ -35,8 +34,6 @@ def get_tickers():
             symbols.append(elem['symbol'])
 
     return symbols
-
-
 
 #funtion to get de candles of X coin 
 
@@ -58,7 +55,6 @@ def klines (symbol):
     resp = resp[::-1]
     return resp
 
-
 #get the symbols if have any position opened, if u dont is gonna return a void array 
 #this so u dont open massive position for the same coin 
 
@@ -72,8 +68,6 @@ def get_positions():
         pos.append(elem["symbol"])
 
     return pos
-
-
 
 #set different parameter for each coin u trade ( cos for one coin can be goot and bad for another one)
 
@@ -89,7 +83,6 @@ def set_mode(symbol):
         print("mode set ... OK")
     except Exception as err:
         print(f"mode set ... NOK")
-
 
 # now we need a funtion to get the decimal number based of the value of the symbol we are trading 
 # so we can validate the position we are opening 
@@ -114,7 +107,6 @@ def get_precision(symbol):
 
 
     return price, qty
-
 
 #now we need a funtion to place orders 
 
@@ -178,7 +170,6 @@ def place_order_market(symbol, side):
     print(resp)
     return resp
 
-
 #now we have to define our strategy 
 
 def rsi_signal(symbol):
@@ -191,7 +182,6 @@ def rsi_signal(symbol):
     else:
         return "none", round(rsi.iloc[-1], 2)
     
-
 max_pos = 10
 symbols = get_tickers()
 
@@ -210,14 +200,7 @@ while True:
                 if len(pos) > max_pos:
                     break
                 signal = rsi_signal(elem)
-
-
-                #print(f"the actual signal trand is: {signal}")
-                #if signal[0] == "none":
-                #    print("wait for 30sec")
-                #    sleep(30)
-
-
+                
                 if signal[0] == 'up' and not elem in pos:
                     print (f'Found BUY signal for {elem}')
                     set_mode(elem)
