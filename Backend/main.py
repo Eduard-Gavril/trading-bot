@@ -1,4 +1,4 @@
-import ta.momentum, ta.trend
+import ta.momentum, ta.trend, ta.volatility
 from api_testnet import Api_key, Api_secret
 from pybit.unified_trading import HTTP
 import pandas as pd
@@ -180,13 +180,13 @@ def rsi_signal(symbol):
         return 'down', round(rsi.iloc[-1], 2)
     else:
         return "none", round(rsi.iloc[-1], 2)
-    
+
 
 def adx_signal(symbol):
-    # Assumendo che klines restituisca un DataFrame con le colonne necessarie
+    # get stick
     kl = klines(symbol)
 
-    # Calcola gli indicatori ADX utilizzando i prezzi di apertura, chiusura e minimo
+    # Calc ADX trend
     adx_indicator = ta.trend.ADXIndicator(kl['High'], kl['Low'], kl['Close'])
     adx = adx_indicator.adx()
     adx_plus = adx_indicator.adx_pos()
@@ -199,25 +199,49 @@ def adx_signal(symbol):
 
     #bull
     if adx_plus_val > adx_minus_val and adx_val > adx_val_old:
-        print(f"AD+: {round(adx_plus_val,2)} AD-: {round(adx_minus_val,2)} is Trend UP with: {round(adx_val-adx_val_old,2)}")
+        #print(f"AD+: {round(adx_plus_val,2)} AD-: {round(adx_minus_val,2)} is Trend UP with: {round(adx_val-adx_val_old,2)}")
         return "up"
     #bear
     if adx_minus_val > adx_plus_val and adx_val > adx_val_old:
-        print(f"AD+: {round(adx_plus_val,2)} AD-: {round(adx_minus_val,2)} is Trend DOWN with: {round(adx_val-adx_val_old,2)}")
+        #print(f"AD+: {round(adx_plus_val,2)} AD-: {round(adx_minus_val,2)} is Trend DOWN with: {round(adx_val-adx_val_old,2)}")
         return "down"
  
+def BB_signal(symbol):
+    # get stick
+    kl = klines(symbol)
+
+    bb_indicator_H = ta.volatility.bollinger_hband(kl.Close, window=15, window_dev=1.5)
+    bb_indicator_L = ta.volatility.bollinger_lband(kl.Close, window=15, window_dev=1.5)
+    bb_indicator_MA = ta.volatility.bollinger_mavg(kl.Close, window=15)
+
+    bb_indicator_H_value = round(bb_indicator_H.iloc[-1])
+    bb_indicator_L_value = round(bb_indicator_L.iloc[-1])
+    bb_indicator_MA_value = round(bb_indicator_MA.iloc[-1])
 
 
-# Esempio di utilizzo della funzione
+    return bb_indicator_H_value , bb_indicator_L_value , bb_indicator_MA_value
+
+
+print(f"BB: {BB_signal('ETHUSDT')}")
+
+def EMA_signal(symbol):
+    # get stick
+    kl = klines(symbol)
+    ema_indicator = ta.trend.ema_indicator(kl.Close)
+    return round(ema_indicator.iloc[-1], 2)
+
+print(f"EMA: {EMA_signal('ETHUSDT')}")
+
+# usecase
 #adx, adx_plus, adx_minus = adx_signal("ETHUSDT")
 #print(f"ADX: {round(adx, 2)}, ADX+: {round(adx_plus,2)}, ADX-: {round(adx_minus,2)}")
 
 max_pos = 10
-#symbols = get_tickers()
-symbols = ["ETHUSDT", "BTCUSDT", "XRPUSDT", "ADAUSDT"]
+symbols = get_tickers()
+#symbols = ["ETHUSDT", "BTCUSDT", "XRPUSDT", "ADAUSDT"]
 
 while True:
-    balance = BalanceAccount()
+    balance = round(BalanceAccount(),2)
     if balance == None:
         print("no more money to trade with")
     if balance != None:
