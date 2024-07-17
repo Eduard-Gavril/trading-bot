@@ -1,11 +1,10 @@
-import ta.momentum
+import ta.momentum, ta.trend
 from api_testnet import Api_key, Api_secret
 from pybit.unified_trading import HTTP
 import pandas as pd
 import ta
 from time import sleep
 import time 
-
 # Calc timestamp in milliseconds
 current_timestamp_ms = int(round(time.time() * 1000))
 
@@ -182,8 +181,40 @@ def rsi_signal(symbol):
     else:
         return "none", round(rsi.iloc[-1], 2)
     
+
+def adx_signal(symbol):
+    # Assumendo che klines restituisca un DataFrame con le colonne necessarie
+    kl = klines(symbol)
+
+    # Calcola gli indicatori ADX utilizzando i prezzi di apertura, chiusura e minimo
+    adx_indicator = ta.trend.ADXIndicator(kl['High'], kl['Low'], kl['Close'])
+    adx = adx_indicator.adx()
+    adx_plus = adx_indicator.adx_pos()
+    adx_minus = adx_indicator.adx_neg()
+
+    adx_val_old = adx.iloc[-2]
+    adx_val = adx.iloc[-1]
+    adx_plus_val = adx_plus.iloc[-1]
+    adx_minus_val = adx_minus.iloc[-1]
+
+    #bull
+    if adx_plus_val > adx_minus_val and adx_val > adx_val_old:
+        print(f"AD+: {round(adx_plus_val,2)} AD-: {round(adx_minus_val,2)} is Trend UP with: {round(adx_val-adx_val_old,2)}")
+        return "up"
+    #bear
+    if adx_minus_val > adx_plus_val and adx_val > adx_val_old:
+        print(f"AD+: {round(adx_plus_val,2)} AD-: {round(adx_minus_val,2)} is Trend DOWN with: {round(adx_val-adx_val_old,2)}")
+        return "down"
+ 
+
+
+# Esempio di utilizzo della funzione
+#adx, adx_plus, adx_minus = adx_signal("ETHUSDT")
+#print(f"ADX: {round(adx, 2)}, ADX+: {round(adx_plus,2)}, ADX-: {round(adx_minus,2)}")
+
 max_pos = 10
-symbols = get_tickers()
+#symbols = get_tickers()
+symbols = ["ETHUSDT", "BTCUSDT", "XRPUSDT", "ADAUSDT"]
 
 while True:
     balance = BalanceAccount()
@@ -199,19 +230,26 @@ while True:
                 pos = get_positions()
                 if len(pos) > max_pos:
                     break
-                signal = rsi_signal(elem)
-                
-                if signal[0] == 'up' and not elem in pos:
-                    print (f'Found BUY signal for {elem}')
-                    set_mode(elem)
-                    sleep(2)
-                    place_order_market(elem, "Buy")
-                    sleep(5)
-                if signal[0] == 'down' and not elem in pos:
-                    print (f'Found SELL signal for {elem}')
-                    set_mode(elem)
-                    sleep(2)
-                    place_order_market(elem, "Sell")
-                    sleep(5)
+                signal_rsi = rsi_signal(elem)
+                signal_adx = adx_signal(elem)
+
+                print(elem, signal_adx)
+
+                if signal_rsi[0] == 'up' and not elem in pos:
+                    print (f'Found RSI BUY signal for {elem}')
+                    if signal_adx == 'up' and not elem in pos:
+                        print (f'Found ADX BUY signal for {elem}')
+                        set_mode(elem)
+                        sleep(2)
+                        place_order_market(elem, "Buy")
+                        sleep(5)
+                if signal_rsi[0] == 'down' and not elem in pos:
+                    print (f'Found RSI SELL signal for {elem}')
+                    if signal_adx == 'down' and not elem in pos:
+                        print (f'Found ADX SELL signal for {elem}')
+                        set_mode(elem)
+                        sleep(2)
+                        place_order_market(elem, "Sell")
+                        sleep(5)
     print("waiting 2 minutes")
     sleep(120)
