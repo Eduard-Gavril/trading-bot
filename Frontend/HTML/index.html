@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantumTrade</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+</head>
+<body>
+    <div class="test">
+        <h3>Saldo del Conto</h3>
+        <p id="saldo">000</p>
+    </div>
+
+    <script>
+        $(document).ready(function(){
+            $.ajax({
+                url: '/saldo',
+                type: 'GET',
+                success: function(data){
+                    $('#saldo').text(data.saldo);
+                },
+                error: function(error){
+                    console.error("Errore nel caricamento del saldo:", error);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
