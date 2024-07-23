@@ -240,6 +240,8 @@ max_pos = 10
 symbols = get_tickers()
 #symbols = ["ETHUSDT", "BTCUSDT", "XRPUSDT", "ADAUSDT"]
 
+
+
 while True:
     balance = round(BalanceAccount(),2)
     if balance == None:
@@ -277,3 +279,9 @@ while True:
                         sleep(5)
     print("waiting 2 minutes")
     sleep(120)
+
+
+
+
+
+
