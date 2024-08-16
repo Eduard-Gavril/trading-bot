@@ -11,7 +11,7 @@ current_timestamp_ms = int(round(time.time() * 1000))
 session = HTTP(
     api_key=Api_key,
     api_secret=Api_secret,
-    testnet=True,
+    testnet=True, # we are working on bybit (Demo or Testnet)
     recv_window=15000,  # adjust the value since we are in a diffrent timezone
 )
 
@@ -22,6 +22,23 @@ def BalanceAccount():
     resp = float(resp)
     return resp
 
+
+
+
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+@app.route('/get-balance', methods=['GET'])
+def get_balance():
+    balance = BalanceAccount()  # Utilizza la tua funzione esistente
+    return jsonify({'balance': balance})
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
+
 #function to get all the coins tradable 
 
 def get_tickers():
@@ -31,7 +48,6 @@ def get_tickers():
     for elem in resp:
         if 'USDT' in elem['symbol'] and not 'USDC' in elem['symbol'] and not "1" in elem['symbol'] :
             symbols.append(elem['symbol'])
-
     return symbols
 
 #funtion to get de candles of X coin 
@@ -41,7 +57,7 @@ def klines (symbol):
         category='linear',
         symbol=symbol,
         interval=15, #minutes
-        limit=500 #last 500 candles
+        limit=250 #last 500 candles
         )['result']['list']
     resp = pd.DataFrame(resp)
     df = pd.DataFrame(resp)
@@ -207,22 +223,31 @@ def adx_signal(symbol):
         return "down"
  
 def BB_signal(symbol):
-    # get stick
     kl = klines(symbol)
 
     bb_indicator_H = ta.volatility.bollinger_hband(kl.Close, window=15, window_dev=1.5)
     bb_indicator_L = ta.volatility.bollinger_lband(kl.Close, window=15, window_dev=1.5)
     bb_indicator_MA = ta.volatility.bollinger_mavg(kl.Close, window=15)
 
-    bb_indicator_H_value = round(bb_indicator_H.iloc[-1])
-    bb_indicator_L_value = round(bb_indicator_L.iloc[-1])
-    bb_indicator_MA_value = round(bb_indicator_MA.iloc[-1])
+    # Aggiorna la definizione del colore delle candele basato su apertura e chiusura
+    def candle_color(open, close):
+        if open < close:
+            return "green"
+        elif open > close:
+            return "red"
+        else:
+            return "gray"
 
+    last_candle_color = candle_color(kl.Open.iloc[-1], kl.Close.iloc[-1])
+    second_last_candle_color = candle_color(kl.Open.iloc[-2], kl.Close.iloc[-2])
 
-    return bb_indicator_H_value , bb_indicator_L_value , bb_indicator_MA_value
+    # Controlla se il colore delle candele è opposto e non grigio
+    if last_candle_color != second_last_candle_color and "gray" not in [last_candle_color, second_last_candle_color]:
+        return "up" if last_candle_color == "green" else "down"
+    else:
+        return "neutral"
 
-
-print(f"BB: {BB_signal('ETHUSDT')}")
+print(BB_signal("ETHUSDT"))
 
 def EMA_signal(symbol):
     # get stick
@@ -230,7 +255,6 @@ def EMA_signal(symbol):
     ema_indicator = ta.trend.ema_indicator(kl.Close)
     return round(ema_indicator.iloc[-1], 2)
 
-print(f"EMA: {EMA_signal('ETHUSDT')}")
 
 # usecase
 #adx, adx_plus, adx_minus = adx_signal("ETHUSDT")
@@ -239,6 +263,28 @@ print(f"EMA: {EMA_signal('ETHUSDT')}")
 max_pos = 10
 symbols = get_tickers()
 #symbols = ["ETHUSDT", "BTCUSDT", "XRPUSDT", "ADAUSDT"]
+
+
+######################################################################################
+#import matplotlib.pyplot as plt
+
+#def plot_rsi(symbol):
+#    kl = klines(symbol)
+#    rsi_indicator = ta.momentum.RSIIndicator(kl.Close).rsi()
+#    
+#    plt.figure(figsize=(12, 6))
+#    plt.plot(rsi_indicator.index[-100:], rsi_indicator.values[-100:], label='RSI')
+#    plt.axhline(y=70, color='r', linestyle='--', label='Overbought')
+#    plt.axhline(y=30, color='g', linestyle='--', label='Oversold')
+#    plt.title(f'RSI per {symbol}')
+#    plt.xlabel('Data')
+#    plt.ylabel('Valore RSI')
+#    plt.legend()
+#    plt.show()
+
+#symbol = "ETHUSDT"  
+#plot_rsi(symbol)
+###########################################################################################
 
 
 
@@ -258,25 +304,34 @@ while True:
                     break
                 signal_rsi = rsi_signal(elem)
                 signal_adx = adx_signal(elem)
+                bb_signal = BB_signal(elem)
 
+                if bb_signal == "up":
+                    print("BB UP")
+                if bb_signal == "down":
+                    print("BB DOWN")
                 print(elem, signal_adx)
-
+                
                 if signal_rsi[0] == 'up' and not elem in pos:
                     print (f'Found RSI BUY signal for {elem}')
                     if signal_adx == 'up' and not elem in pos:
                         print (f'Found ADX BUY signal for {elem}')
-                        set_mode(elem)
-                        sleep(2)
-                        place_order_market(elem, "Buy")
-                        sleep(5)
+                        
+                        if bb_signal == "up":
+                            set_mode(elem)
+                            sleep(2)
+                            place_order_market(elem, "Buy")
+                            sleep(5)
                 if signal_rsi[0] == 'down' and not elem in pos:
                     print (f'Found RSI SELL signal for {elem}')
                     if signal_adx == 'down' and not elem in pos:
                         print (f'Found ADX SELL signal for {elem}')
-                        set_mode(elem)
-                        sleep(2)
-                        place_order_market(elem, "Sell")
-                        sleep(5)
+
+                        if bb_signal == "down":
+                            set_mode(elem)
+                            sleep(2)
+                            place_order_market(elem, "Sell")
+                            sleep(5)
     print("waiting 2 minutes")
     sleep(120)
 
